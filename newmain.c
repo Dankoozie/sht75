@@ -83,6 +83,10 @@ unsigned int sht_read(char val){
     //Send command
     SendByte(val,20);
     
+    //Add command to crc
+    doCRC(val,&crc);
+    
+    
     //Read ack bit
     TRISC = 0b00110001;
     
@@ -99,7 +103,9 @@ unsigned int sht_read(char val){
     
     
     th=ReadByte();
+    doCRC(th,&crc);
     tl=ReadByte();
+    doCRC(th,&crc);
     crc=ReadByte();
 
     

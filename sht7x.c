@@ -82,7 +82,7 @@ void DegreesAsc(int sensorval,char* buf,char volt) {
 
 /**
  * doCRC
- *
+ * <<<This function is shamelessly copied from elsewhere>>>
  *      Routine to calculate the CRC while message is sent / received
  *
  * Parameters:

@@ -22,6 +22,7 @@ void w1(char);
 void wastetime(int);
 void SendACK(void);
 void DegreesAsc(int,char*,char);
+void doCRC(char,char*);
 
 
 #ifdef	__cplusplus
