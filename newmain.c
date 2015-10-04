@@ -17,6 +17,13 @@
 int cnt = 0;
 int upto = 3;
 
+char CRCr = 0;
+char CRCg = 0;
+
+static const char *ctemp = "Current temperature: ";
+static const char *chum = "Current humidity: ";
+static const char *sht_status = "SHT7x sensor status: ";
+
 // #pragma config statements should precede project file includes.
 // Use project enums instead of #define for ON and OFF.
 
@@ -31,7 +38,6 @@ int upto = 3;
 #pragma config IESO = OFF       // Internal External Switchover bit (Internal External Switchover mode is disabled)
 #pragma config FCMEN = OFF      // Fail-Safe Clock Monitor Enabled bit (Fail-Safe Clock Monitor is disabled)
 
-void UART_Write(char);
 
 
 void interrupt tc_int(void)
@@ -58,13 +64,6 @@ void interrupt tc_int(void)
 
 
 
-
-void UART_Write(char data)
-{
-  while(!TRMT);
-  TXREG = data;
-}
-
 void setser(void)
 {
     return;
@@ -76,73 +75,53 @@ void setser(void)
 unsigned int sht_read(char val){
     long wait_val = 0;
     
-    char ack;
     char th;
     char tl;
     char crc;
-    //Send command
-    SendByte(val,20);
+    char received_crc;
+    
+    
     
     //Add command to crc
     doCRC(val,&crc);
+    //Send command
+    SendByte(val,20);
     
-    
-    //Read ack bit
-    TRISC = 0b00110001;
-    
-    PORTC = 0b00000010;
-    w1(3);
-    ack = PORTC & 1;
-    PORTC = 0b00000000;
-    
-    __delay_us(100);
-    //Wait for line to be pulled low
-    while((PORTC & 1) == 1) {
-        wait_val++;
-    }
-    
-    
-    th=ReadByte();
-    doCRC(th,&crc);
-    tl=ReadByte();
-    doCRC(th,&crc);
-    crc=ReadByte();
 
     
+    
+   
+    
+    __delay_us(20);
+    //Wait for line to be pulled low
+    while((PORTC & 1) == 1) {
+       wait_val++;
+      //  UART_Write(119);
+      // if(wait_val > 50000) { return 0;}
+    }
+   
+    //__delay_ms(20);
+    
+    th=ReadByte(1);
+    tl=ReadByte(1);
+   
+    received_crc=ReadByte(1);
+
+    doCRC(th,&crc);
+    doCRC(tl,&crc);
+    
     TRISC = 0b00110000;
+    
+    CRCr = received_crc;
+    CRCg = crc;
     return (th<<8) + tl;
 }
 
 
 
 
-void SendByte(char byt, char wt) {
-    char pc = byt;
-    char c;
-    for(c=0;c<8;c++){
-        if ((pc & 0x80) != 0) {
-        PORTCbits.RC0 = 1;
-        __delay_us(10);
-        PORTCbits.RC1 = 1;
-        __delay_us(20);
-        PORTC = 0b00000001;
-        __delay_us(20);
-        PORTC = 0b00000000;
-        
-        }
-        else {
-        PORTC = 0b00000010;
-        __delay_us(20);
-        PORTC = 0b00000000;
-        __delay_us(20);
-            
-        }
-        pc = pc << 1;
-    }
- //Check for ACK
-}
 
-char ReadByte(){
+char ReadByte(char getCRC){
     //TRISC must be 0b00110000 before using this
     char c;
     char rcv;
@@ -162,7 +141,7 @@ char ReadByte(){
         PORTCbits.RC1 = 0;
         __delay_us(20);
 }    
-    
+    if(getCRC){
              TRISCbits.TRISC0 = 0;
              PORTCbits.RC0 = 0;
              __delay_us(8);
@@ -172,7 +151,7 @@ char ReadByte(){
                 PORTCbits.RC0 = 0;
             TRISCbits.TRISC0 = 1;
             __delay_us(12);
-            
+    }        
    
     return rcv;
     
@@ -180,7 +159,6 @@ char ReadByte(){
 
 
 void main(void) {
-    char star[10];
     OSCCON = 0b11100001;
     unsigned int i;
     int cs;
@@ -207,9 +185,15 @@ void main(void) {
     
    
         
-            
-        
 
+         
+ /*   while(1){
+            SupSeq();
+            i = sht_read(READ_TEMP); 
+            __delay_ms(50);
+        
+    }
+*/
 
 
         
@@ -218,17 +202,22 @@ void main(void) {
             SupSeq();
             i = sht_read(READ_TEMP);   
             //cnt = 0;
-            DegreesAsc(i,star,33);
-            UART_Write(106);
-            UART_Write(star[0]);
-            UART_Write(star[1]);
-            UART_Write(star[2]);
-            UART_Write(star[3]);
+            UART_Const(ctemp);
+            UART_Temp(i,33);
+            if(CRCr == CRCg) { UART_Write(33);}
+            else{UART_Write(63);}
             UART_Write(10);
             UART_Write(13);
-            
-            
-                    
+            UART_Const(chum);
+            SupSeq();
+            i = sht_read(READ_HUMIDITY);
+            CalcHumidity(i);
+            UART_Write(10);
+            UART_Write(13);
+            UART_Const(sht_status);
+            UART_Write(10);
+            UART_Write(13);
+            //SendByte(READ_RESET,20);
     __delay_ms(1000);                
     }
     

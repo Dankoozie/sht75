@@ -16,13 +16,21 @@ const char READ_RESET = 0b00011110;
 
 unsigned int sht_read(char);
 void SendByte(char,char);
-char ReadByte(void);
+char ReadByte(char);
 void SupSeq(void);
 void w1(char);
 void wastetime(int);
 void SendACK(void);
-void DegreesAsc(int,char*,char);
+//void DegreesAsc(int,char*,char*,char);
 void doCRC(char,char*);
+int CalcHumidity(int);
+
+
+
+void UART_Write(char);
+void UART_String(char*);
+void UART_Const(const char*);
+void UART_Temp(int,char);
 
 
 #ifdef	__cplusplus
