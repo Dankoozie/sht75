@@ -14,7 +14,7 @@ const char READ_HUMIDITY = 0b00000101;
 const char READ_STATUS = 0b00000111;
 const char READ_RESET = 0b00011110;
 
-unsigned int sht_read(char);
+unsigned int sht_read(char,char);
 void SendByte(char,char);
 char ReadByte(char);
 void SupSeq(void);
@@ -25,7 +25,7 @@ void SendACK(void);
 void doCRC(char,char*);
 int CalcHumidity(int,int);
 
-char sensor_status(void);
+//char sensor_status(void);
 void zero_b(char);
 void Set_Settings(char);
 

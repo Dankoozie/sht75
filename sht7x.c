@@ -263,7 +263,7 @@ void zero_b(char bt){
         else{UART_Write(48);}
     }
 }
-
+/*
 char sensor_status(void) {
     long wait_val = 0;
     char crc;
@@ -285,6 +285,7 @@ char sensor_status(void) {
     
      return stat;
 }
+*/
 
 void Set_Settings(char setts) {
     long wait_val = 0;

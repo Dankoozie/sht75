@@ -65,13 +65,16 @@ void setser(void)
 
 
 
-unsigned int sht_read(char val){
+unsigned int sht_read(char val,char bytes){
     long wait_val = 0;
     
-    char th;
-    char tl;
-    char crc;
+    char th = 0;
+    char tl = 0;
+    char crc = 0;
     char received_crc;
+    
+    unsigned int ix;
+    char revCRC;
     
     //Add command to crc
     doCRC(val,&crc);
@@ -91,18 +94,36 @@ unsigned int sht_read(char val){
    
     //__delay_ms(20);
     
-    th=ReadByte(1);
+    if(bytes == 2){
+        th=ReadByte(1);
+        doCRC(th,&crc);
+    }
+    
     tl=ReadByte(1);
    
-    received_crc=ReadByte(1);
+    received_crc=ReadByte(0);
 
-    doCRC(th,&crc);
+    
     doCRC(tl,&crc);
     
     TRISC = 0b00110000;
     
+  // doCRC(received_crc,&crc);
+    
+ 
+   
+   revCRC = 0; 
+   for (ix = 0; ix < 8; ix++) {
+      if ((0x80 >> ix) & received_crc)
+        revCRC |= (1 << ix);
+    }
+   
+   received_crc = revCRC;
+   
+    
     CRCr = received_crc;
     CRCg = crc;
+   
     return (th<<8) + tl;
 }
 
@@ -143,7 +164,7 @@ void main(void) {
   //  while(1){
   //  Set_Settings(0b11111111);
    // }
-    
+ /*   
     while(1){
         UART_Write(10);
         UART_Write(13);
@@ -153,12 +174,12 @@ void main(void) {
         doCRC(0b00000000,&kirk);
         zero_b(kirk);
     }
-    
+   */ 
     
     while(1) {
         CLRWDT();
             
-            t = sht_read(READ_TEMP);   
+            t = sht_read(READ_TEMP,2);   
             //cnt = 0;
             UART_Const(ctemp);
             UART_Temp(t,33);
@@ -171,10 +192,14 @@ void main(void) {
             zero_b(CRCg);
                     
             UART_Const(chum);
-            h = sht_read(READ_HUMIDITY);
+            h = sht_read(READ_HUMIDITY,2);
             CalcHumidity(h,t);
             UART_Const(sht_status);
-            zero_b(sensor_status());
+            zero_b(sht_read(0b00000111,1));
+            UART_Write(32);
+            zero_b(CRCr);
+            UART_Write(32);
+            zero_b(CRCg);
     __delay_ms(1000);        
     }
     
