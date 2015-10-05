@@ -8,10 +8,6 @@
 
 #include <xc.h>
 #include <stdio.h>
-
-
-
-
 #include "sht7x.h"
 #include <pic16f688.h>
 int cnt = 0;
@@ -20,9 +16,10 @@ int upto = 3;
 char CRCr = 0;
 char CRCg = 0;
 
-static const char *ctemp = "Current temperature: ";
-static const char *chum = "Current humidity: ";
-static const char *sht_status = "SHT7x sensor status: ";
+static const char *ctemp = "\n\rCurrent temperature: ";
+static const char *chum = "\n\rCurrent humidity (compensated): ";
+static const char *sht_status = "\n\rSHT7x sensor status: ";
+static const char *circ = " CRC: ";
 
 // #pragma config statements should precede project file includes.
 // Use project enums instead of #define for ON and OFF.
@@ -40,34 +37,30 @@ static const char *sht_status = "SHT7x sensor status: ";
 
 
 
-void interrupt tc_int(void)
-
-{
+void interrupt tc_int(void) {
+    
     unsigned int i = 0;
     if(PIR1bits.TMR1IF) 
     {
 
         PIR1bits.TMR1IF = 0;
         cnt++;
-
         
-
     }
-        
-        
+          
         
         }
         
 
-
-
-
-
-
 void setser(void)
 {
-    return;
+    TXSTA = 0b00100000;
+    RCSTA = 0b10010000;
+    SPBRG = 51; //1200 @ 4MHZ
+    BAUDCTLbits.BRG16 = 0;
 }
+
+
 
 
 
@@ -80,16 +73,12 @@ unsigned int sht_read(char val){
     char crc;
     char received_crc;
     
-    
-    
     //Add command to crc
     doCRC(val,&crc);
+    
     //Send command
+    SupSeq(); //Start up sequence
     SendByte(val,20);
-    
-
-    
-    
    
     
     __delay_us(20);
@@ -120,48 +109,14 @@ unsigned int sht_read(char val){
 
 
 
-
-char ReadByte(char getCRC){
-    //TRISC must be 0b00110000 before using this
-    char c;
-    char rcv;
-    char ack = 0;
-    //test
-    //if((PORTC & 1) ==1) {return 0xFF;}
-    //else{return 0x00;}
-    
-    
-    for(c=0;c<8;c++){
-        PORTCbits.RC1 = 1;
-        __delay_us(20);     
-        if(c<8) {rcv = (rcv <<1)  + (PORTC & 1);}
-        else{ack = PORTC & 1;}
-               
-        
-        PORTCbits.RC1 = 0;
-        __delay_us(20);
-}    
-    if(getCRC){
-             TRISCbits.TRISC0 = 0;
-             PORTCbits.RC0 = 0;
-             __delay_us(8);
-             PORTCbits.RC1 = 1;
-             __delay_us(20);
-             PORTCbits.RC1 = 0;
-                PORTCbits.RC0 = 0;
-            TRISCbits.TRISC0 = 1;
-            __delay_us(12);
-    }        
-   
-    return rcv;
-    
-}
-
-
 void main(void) {
     OSCCON = 0b11100001;
-    unsigned int i;
-    int cs;
+    
+    unsigned int t,h;
+    char shtstat;
+    
+    char kirk = 0;
+    
     char tsend;
     char th = 0;
     char tl = 0;
@@ -169,11 +124,9 @@ void main(void) {
     TRISA = 0x00;
     ANSEL = 0x00;
     
+    setser();
+    
     TRISC = 0b00110000;
-    TXSTA = 0b00100000;
-    RCSTA = 0b10010000;
-    SPBRG = 51; //1200 @ 4MHZ
-    BAUDCTLbits.BRG16 = 0;
     //Timer
     INTCON = 0xC0;
     PIE1bits.TMR1IE = 1;
@@ -182,45 +135,48 @@ void main(void) {
     TMR1H = 0X00;
     T1CON = 0x35; //timer1 on
     CMCON0 = 0b00000111;
+        
+
     
+  //  SendByte(0b00011110,20);
    
+  //  while(1){
+  //  Set_Settings(0b11111111);
+   // }
+    
+    while(1){
+        UART_Write(10);
+        UART_Write(13);
+        kirk = 0;
         
-
-         
- /*   while(1){
-            SupSeq();
-            i = sht_read(READ_TEMP); 
-            __delay_ms(50);
-        
+        doCRC(0b00000111,&kirk);
+        doCRC(0b00000000,&kirk);
+        zero_b(kirk);
     }
-*/
-
-
-        
-     while(1) {
+    
+    
+    while(1) {
         CLRWDT();
-            SupSeq();
-            i = sht_read(READ_TEMP);   
+            
+            t = sht_read(READ_TEMP);   
             //cnt = 0;
             UART_Const(ctemp);
-            UART_Temp(i,33);
+            UART_Temp(t,33);
             if(CRCr == CRCg) { UART_Write(33);}
             else{UART_Write(63);}
-            UART_Write(10);
-            UART_Write(13);
+            
+            UART_Const(circ);
+            zero_b(CRCr);
+            UART_Write(32);
+            zero_b(CRCg);
+                    
             UART_Const(chum);
-            SupSeq();
-            i = sht_read(READ_HUMIDITY);
-            CalcHumidity(i);
-            UART_Write(10);
-            UART_Write(13);
+            h = sht_read(READ_HUMIDITY);
+            CalcHumidity(h,t);
             UART_Const(sht_status);
-            UART_Write(10);
-            UART_Write(13);
-            //SendByte(READ_RESET,20);
-    __delay_ms(1000);                
+            zero_b(sensor_status());
+    __delay_ms(1000);        
     }
-    
     
     return;
         

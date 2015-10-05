@@ -23,8 +23,11 @@ void wastetime(int);
 void SendACK(void);
 //void DegreesAsc(int,char*,char*,char);
 void doCRC(char,char*);
-int CalcHumidity(int);
+int CalcHumidity(int,int);
 
+char sensor_status(void);
+void zero_b(char);
+void Set_Settings(char);
 
 
 void UART_Write(char);
