@@ -3,10 +3,17 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sht7x.h"
 #define _XTAL_FREQ 8000000     
+
 #define CRC_POLY        0x31            /* CRC polynomial x**8 + x**5 + x**4 */
+#define SUP_WAIT        10      //Number of uS to wait between startup sequence steps
+#define SHT_TIMEOUT     800000 //Number of iterations to wait for SHT to return command
 
 const float RHc = -1.5955E-6;
+char CRCr = 0;
+char CRCg = 0;
+
 
 
 char ReadByte(char getCRC){
@@ -66,19 +73,19 @@ void SupSeq(void){
         PORTC = 0b00000000;
         __delay_us(2);
         PORTC = 0b00000001;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000011;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000010;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000000;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000010;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000011;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000001;
-        __delay_us(10);
+        __delay_us(SUP_WAIT);
         PORTC = 0b00000000;
 }
 
@@ -263,29 +270,7 @@ void zero_b(char bt){
         else{UART_Write(48);}
     }
 }
-/*
-char sensor_status(void) {
-    long wait_val = 0;
-    char crc;
-    char stat;
-    SupSeq();
-    SendByte(0b00000111,20);
-    
-            
-     __delay_us(60);
-    //Wait for line to be pulled low
-    while((PORTC & 1) == 1) {
-       wait_val++;
-    }
-     
-    stat=ReadByte(1);
-    crc=ReadByte(1);
 
-    TRISC = 0b00110000;
-    
-     return stat;
-}
-*/
 
 void Set_Settings(char setts) {
     long wait_val = 0;
@@ -301,4 +286,127 @@ void Set_Settings(char setts) {
         TRISC = 0b00110000;
 
         __delay_ms(10);
+}
+
+/*
+unsigned int sht_read(char val,char bytes){
+    long wait_val = 0;
+    
+    char th = 0;
+    char tl = 0;
+    char crc = 0;
+    char received_crc;
+    
+    unsigned int ix;
+    char revCRC;
+    
+    //Add command to crc
+    doCRC(val,&crc);
+    
+    //Send command
+    SupSeq(); //Start up sequence
+    SendByte(val,20);
+   
+    
+    __delay_us(20);
+    //Wait for line to be pulled low
+    while((PORTC & 1) == 1) {
+       wait_val++;
+      //  UART_Write(119);
+      // if(wait_val > 50000) { return 0;}
+    }
+   
+    //__delay_ms(20);
+    
+    if(bytes == 2){
+        th=ReadByte(1);
+        doCRC(th,&crc);
+    }
+    
+    tl=ReadByte(1);
+   
+    received_crc=ReadByte(0);
+
+    
+    doCRC(tl,&crc);
+    
+    TRISC = 0b00110000;
+    
+  // doCRC(received_crc,&crc);
+    
+ 
+   
+   revCRC = 0; 
+   for (ix = 0; ix < 8; ix++) {
+      if ((0x80 >> ix) & received_crc)
+        revCRC |= (1 << ix);
+    }
+   
+   received_crc = revCRC;
+   
+    
+    CRCr = received_crc;
+    CRCg = crc;
+   
+    return (th<<8) + tl;
+}
+*/
+
+
+Sht_rtn Sensor_read(char val,char bytes){
+    Sht_rtn rval;
+    rval.wait_val = 0;
+    
+    char th = 0;
+    char tl = 0;
+    rval.crc_generated = 0;
+    
+    unsigned int ix;
+    char revCRC = 0;
+    
+    //Add command to crc
+    doCRC(val,&rval.crc_generated);
+    
+    //Send command
+    SupSeq(); //Start up sequence
+    SendByte(val,20);
+   
+   
+    __delay_us(20);
+    //Wait for line to be pulled low
+    while(((PORTC & 1) == 1) && rval.wait_val < SHT_TIMEOUT) {
+       rval.wait_val++;
+    }
+   
+    //__delay_ms(20);
+    
+    if(bytes == 2){
+        th=ReadByte(1);
+        doCRC(th,&rval.crc_generated);
+    }
+    
+    tl=ReadByte(1);
+   
+    rval.crc_received=ReadByte(0);
+
+    
+    doCRC(tl,&rval.crc_generated);
+    
+    TRISC = 0b00110000;
+     
+ 
+   
+
+   for (ix = 0; ix < 8; ix++) {
+      if ((0x80 >> ix) & rval.crc_received)
+        revCRC |= (1 << ix);
+    }
+  rval.crc_received = revCRC;
+  if (rval.crc_generated == rval.crc_received) { rval.crc_ok = 1;}
+  
+   
+   rval.sensor_val = (th<<8) + tl;
+   
+   return rval;
+
 }

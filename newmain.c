@@ -11,10 +11,8 @@
 #include "sht7x.h"
 #include <pic16f688.h>
 int cnt = 0;
-int upto = 3;
 
-char CRCr = 0;
-char CRCg = 0;
+
 
 static const char *ctemp = "\n\rCurrent temperature: ";
 static const char *chum = "\n\rCurrent humidity (compensated): ";
@@ -35,8 +33,6 @@ static const char *circ = " CRC: ";
 #pragma config IESO = OFF       // Internal External Switchover bit (Internal External Switchover mode is disabled)
 #pragma config FCMEN = OFF      // Fail-Safe Clock Monitor Enabled bit (Fail-Safe Clock Monitor is disabled)
 
-
-
 void interrupt tc_int(void) {
     
     unsigned int i = 0;
@@ -51,7 +47,6 @@ void interrupt tc_int(void) {
         
         }
         
-
 void setser(void)
 {
     TXSTA = 0b00100000;
@@ -60,88 +55,11 @@ void setser(void)
     BAUDCTLbits.BRG16 = 0;
 }
 
-
-
-
-
-
-unsigned int sht_read(char val,char bytes){
-    long wait_val = 0;
-    
-    char th = 0;
-    char tl = 0;
-    char crc = 0;
-    char received_crc;
-    
-    unsigned int ix;
-    char revCRC;
-    
-    //Add command to crc
-    doCRC(val,&crc);
-    
-    //Send command
-    SupSeq(); //Start up sequence
-    SendByte(val,20);
-   
-    
-    __delay_us(20);
-    //Wait for line to be pulled low
-    while((PORTC & 1) == 1) {
-       wait_val++;
-      //  UART_Write(119);
-      // if(wait_val > 50000) { return 0;}
-    }
-   
-    //__delay_ms(20);
-    
-    if(bytes == 2){
-        th=ReadByte(1);
-        doCRC(th,&crc);
-    }
-    
-    tl=ReadByte(1);
-   
-    received_crc=ReadByte(0);
-
-    
-    doCRC(tl,&crc);
-    
-    TRISC = 0b00110000;
-    
-  // doCRC(received_crc,&crc);
-    
- 
-   
-   revCRC = 0; 
-   for (ix = 0; ix < 8; ix++) {
-      if ((0x80 >> ix) & received_crc)
-        revCRC |= (1 << ix);
-    }
-   
-   received_crc = revCRC;
-   
-    
-    CRCr = received_crc;
-    CRCg = crc;
-   
-    return (th<<8) + tl;
-}
-
-
-
-
 void main(void) {
     OSCCON = 0b11100001;
+    Sht_rtn sh;
+    int t;
     
-    unsigned int t,h;
-    char shtstat;
-    
-    char kirk = 0;
-    
-    char tsend;
-    char th = 0;
-    char tl = 0;
-    long waste_time = 0;  
     TRISA = 0x00;
     ANSEL = 0x00;
     
@@ -158,49 +76,28 @@ void main(void) {
     CMCON0 = 0b00000111;
         
 
-    
-  //  SendByte(0b00011110,20);
-   
-  //  while(1){
-  //  Set_Settings(0b11111111);
-   // }
- /*   
-    while(1){
-        UART_Write(10);
-        UART_Write(13);
-        kirk = 0;
-        
-        doCRC(0b00000111,&kirk);
-        doCRC(0b00000000,&kirk);
-        zero_b(kirk);
-    }
-   */ 
-    
     while(1) {
         CLRWDT();
             
-            t = sht_read(READ_TEMP,2);   
+            sh = Sensor_read(READ_TEMP,2);   
             //cnt = 0;
             UART_Const(ctemp);
+            t = sh.sensor_val;
             UART_Temp(t,33);
-            if(CRCr == CRCg) { UART_Write(33);}
-            else{UART_Write(63);}
+            //if(CRCr == CRCg) { UART_Write(33);}
+            //else{UART_Write(63);}
             
             UART_Const(circ);
-            zero_b(CRCr);
+            zero_b(sh.crc_generated);
             UART_Write(32);
-            zero_b(CRCg);
+            zero_b(sh.crc_received);
                     
             UART_Const(chum);
-            h = sht_read(READ_HUMIDITY,2);
-            CalcHumidity(h,t);
+            sh = Sensor_read(READ_HUMIDITY,2);
+            CalcHumidity(sh.sensor_val,t);
             UART_Const(sht_status);
-            zero_b(sht_read(0b00000111,1));
-            UART_Write(32);
-            zero_b(CRCr);
-            UART_Write(32);
-            zero_b(CRCg);
-    __delay_ms(1000);        
+            zero_b(Sensor_read(READ_STATUS,1).sensor_val & 255);
+    __delay_ms(2000);        
     }
     
     return;

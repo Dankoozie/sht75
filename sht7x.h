@@ -14,18 +14,29 @@ const char READ_HUMIDITY = 0b00000101;
 const char READ_STATUS = 0b00000111;
 const char READ_RESET = 0b00011110;
 
+typedef struct sht_return
+{
+    int sensor_val;
+    
+    char crc_generated;
+    char crc_received;
+    char crc_ok;
+    
+    char in_cmd;
+    char bytecount;
+    long wait_val;
+    char error;
+} Sht_rtn;
+
+
 unsigned int sht_read(char,char);
 void SendByte(char,char);
 char ReadByte(char);
 void SupSeq(void);
-void w1(char);
-void wastetime(int);
 void SendACK(void);
-//void DegreesAsc(int,char*,char*,char);
 void doCRC(char,char*);
 int CalcHumidity(int,int);
 
-//char sensor_status(void);
 void zero_b(char);
 void Set_Settings(char);
 
@@ -34,6 +45,7 @@ void UART_Write(char);
 void UART_String(char*);
 void UART_Const(const char*);
 void UART_Temp(int,char);
+Sht_rtn Sensor_read(char,char);
 
 
 #ifdef	__cplusplus
