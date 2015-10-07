@@ -11,9 +11,6 @@
 #define SHT_TIMEOUT     800000 //Number of iterations to wait for SHT to return command
 
 const float RHc = -1.5955E-6;
-char CRCr = 0;
-char CRCg = 0;
-
 
 
 char ReadByte(char getCRC){
@@ -21,10 +18,6 @@ char ReadByte(char getCRC){
     char c;
     char rcv;
     char ack = 0;
-    //test
-    //if((PORTC & 1) ==1) {return 0xFF;}
-    //else{return 0x00;}
-    
     
     for(c=0;c<8;c++){
         PORTCbits.RC1 = 1;
@@ -288,69 +281,6 @@ void Set_Settings(char setts) {
         __delay_ms(10);
 }
 
-/*
-unsigned int sht_read(char val,char bytes){
-    long wait_val = 0;
-    
-    char th = 0;
-    char tl = 0;
-    char crc = 0;
-    char received_crc;
-    
-    unsigned int ix;
-    char revCRC;
-    
-    //Add command to crc
-    doCRC(val,&crc);
-    
-    //Send command
-    SupSeq(); //Start up sequence
-    SendByte(val,20);
-   
-    
-    __delay_us(20);
-    //Wait for line to be pulled low
-    while((PORTC & 1) == 1) {
-       wait_val++;
-      //  UART_Write(119);
-      // if(wait_val > 50000) { return 0;}
-    }
-   
-    //__delay_ms(20);
-    
-    if(bytes == 2){
-        th=ReadByte(1);
-        doCRC(th,&crc);
-    }
-    
-    tl=ReadByte(1);
-   
-    received_crc=ReadByte(0);
-
-    
-    doCRC(tl,&crc);
-    
-    TRISC = 0b00110000;
-    
-  // doCRC(received_crc,&crc);
-    
- 
-   
-   revCRC = 0; 
-   for (ix = 0; ix < 8; ix++) {
-      if ((0x80 >> ix) & received_crc)
-        revCRC |= (1 << ix);
-    }
-   
-   received_crc = revCRC;
-   
-    
-    CRCr = received_crc;
-    CRCg = crc;
-   
-    return (th<<8) + tl;
-}
-*/
 
 
 Sht_rtn Sensor_read(char val,char bytes){
@@ -377,8 +307,6 @@ Sht_rtn Sensor_read(char val,char bytes){
     while(((PORTC & 1) == 1) && rval.wait_val < SHT_TIMEOUT) {
        rval.wait_val++;
     }
-   
-    //__delay_ms(20);
     
     if(bytes == 2){
         th=ReadByte(1);
@@ -394,9 +322,6 @@ Sht_rtn Sensor_read(char val,char bytes){
     
     TRISC = 0b00110000;
      
- 
-   
-
    for (ix = 0; ix < 8; ix++) {
       if ((0x80 >> ix) & rval.crc_received)
         revCRC |= (1 << ix);

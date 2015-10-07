@@ -84,8 +84,6 @@ void main(void) {
             UART_Const(ctemp);
             t = sh.sensor_val;
             UART_Temp(t,33);
-            //if(CRCr == CRCg) { UART_Write(33);}
-            //else{UART_Write(63);}
             
             UART_Const(circ);
             zero_b(sh.crc_generated);
