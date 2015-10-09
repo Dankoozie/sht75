@@ -238,6 +238,16 @@ int CalcHumidity(int sensorval,int tempval){
     return 0;
 }
 
+int HumidityPercent(int sensorval,int tempval){
+    float rh; 
+    char buf[10];
+    rh = -2.0468 + (0.0367 * sensorval) + ((RHc * sensorval)*(RHc * sensorval));
+    //Temperature compensate
+    rh = ((tempval / 100) - 25) * (0.01 + (0.00008 * sensorval)) + rh;
+    return (int) rh*100;
+}
+
+
 void zero_b(char bt){
     char lp;
     UART_Write(48);

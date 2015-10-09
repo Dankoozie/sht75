@@ -12,15 +12,14 @@
 #include <pic16f688.h>
 int cnt = 0;
 
+#define OUTPUT 1 //0 = TEXT 1 = BIN
 
 
 static const char *ctemp = "\n\rCurrent temperature: ";
 static const char *chum = "\n\rCurrent humidity (compensated): ";
 static const char *sht_status = "\n\rSHT7x sensor status: ";
-static const char *circ = " CRC: ";
+static const char *circ = " CRC OK";
 
-// #pragma config statements should precede project file includes.
-// Use project enums instead of #define for ON and OFF.
 
 // CONFIG
 #pragma config FOSC = INTOSCIO  // Oscillator Selection bits (INTOSCIO oscillator: I/O function on RA4/OSC2/CLKOUT pin, I/O function on RA5/OSC1/CLKIN)
@@ -58,7 +57,9 @@ void setser(void)
 void main(void) {
     OSCCON = 0b11100001;
     Sht_rtn sh;
+    Sht_rtn hum;
     int t;
+    int h;
     
     TRISA = 0x00;
     ANSEL = 0x00;
@@ -78,24 +79,46 @@ void main(void) {
 
     while(1) {
         CLRWDT();
-            
+        if (OUTPUT == 0){
             sh = Sensor_read(READ_TEMP,2);   
             //cnt = 0;
             UART_Const(ctemp);
             t = sh.sensor_val;
             UART_Temp(t,33);
             
+            if(sh.crc_ok){
             UART_Const(circ);
-            zero_b(sh.crc_generated);
-            UART_Write(32);
-            zero_b(sh.crc_received);
-                    
+            }
+            
+            
             UART_Const(chum);
             sh = Sensor_read(READ_HUMIDITY,2);
             CalcHumidity(sh.sensor_val,t);
             UART_Const(sht_status);
             zero_b(Sensor_read(READ_STATUS,1).sensor_val & 255);
-    __delay_ms(2000);        
+        }
+        
+        if(OUTPUT == 1)
+        {
+            sh = Sensor_read(READ_TEMP,2);
+            UART_Write(0xFF);
+            UART_Write(0xFF);
+            t = DegreesC(sh.sensor_val);
+            UART_Write(t >> 8);
+            UART_Write(t & 255);
+            hum = Sensor_read(READ_HUMIDITY,2);
+            h = HumidityPercent(hum.sensor_val,sh.sensor_val);
+            UART_Write(h >> 8);
+            UART_Write(h & 255);
+            UART_Write(Sensor_read(READ_STATUS,1).sensor_val & 255);
+            UART_Write(0x00); //For future outdoorsie temperature
+            UART_Write((sh.crc_ok << 1 ) + hum.crc_ok);
+            
+            
+         
+        }
+            
+          __delay_ms(2000);        
     }
     
     return;

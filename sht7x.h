@@ -36,6 +36,8 @@ void SupSeq(void);
 void SendACK(void);
 void doCRC(char,char*);
 int CalcHumidity(int,int);
+int HumidityPercent(int,int);
+int DegreesC(int);
 
 void zero_b(char);
 void Set_Settings(char);
