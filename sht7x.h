@@ -30,7 +30,7 @@ typedef struct sht_return
 
 
 unsigned int sht_read(char,char);
-void SendByte(char,char);
+void SendByte(char);
 char ReadByte(char);
 void SupSeq(void);
 void SendACK(void);

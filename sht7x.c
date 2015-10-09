@@ -9,6 +9,7 @@
 #define CRC_POLY        0x31            /* CRC polynomial x**8 + x**5 + x**4 */
 #define SUP_WAIT        10      //Number of uS to wait between startup sequence steps
 #define SHT_TIMEOUT     800000 //Number of iterations to wait for SHT to return command
+#define READ_WAIT       20        //Number of uS between read states
 
 const float RHc = -1.5955E-6;
 
@@ -21,20 +22,20 @@ char ReadByte(char getCRC){
     
     for(c=0;c<8;c++){
         PORTCbits.RC1 = 1;
-        __delay_us(20);     
+        __delay_us(READ_WAIT);     
         if(c<8) {rcv = (rcv <<1)  + (PORTC & 1);}
         else{ack = PORTC & 1;}
                
         
         PORTCbits.RC1 = 0;
-        __delay_us(20);
+        __delay_us(READ_WAIT);
 }    
     if(getCRC){
              TRISCbits.TRISC0 = 0;
              PORTCbits.RC0 = 0;
              __delay_us(8);
              PORTCbits.RC1 = 1;
-             __delay_us(20);
+             __delay_us(READ_WAIT);
              PORTCbits.RC1 = 0;
                 PORTCbits.RC0 = 0;
             TRISCbits.TRISC0 = 1;
@@ -52,7 +53,7 @@ void SendACK(){
     PORTCbits.RC0 = 0;
     __delay_us(8);
     PORTCbits.RC1 = 1;
-    __delay_us(20);
+    __delay_us(READ_WAIT);
     PORTCbits.RC1 = 0;
     PORTCbits.RC0 = 0;
     TRISCbits.TRISC0 = 1;
@@ -82,32 +83,31 @@ void SupSeq(void){
         PORTC = 0b00000000;
 }
 
-void SendByte(char byt, char wt) {
-    char pc = byt;
+void SendByte(char byt) {
     char ack;
     char c;
     for(c=0;c<8;c++){
-        if ((pc & 0x80) != 0) {
+        if ((byt & 0x80) != 0) {
         PORTCbits.RC0 = 1;
         __delay_us(10);
         PORTCbits.RC1 = 1;
-        __delay_us(20);
+        __delay_us(READ_WAIT);
         PORTC = 0b00000001;
-        __delay_us(20);
+        __delay_us(READ_WAIT);
        
         
         }
         else{
         
         PORTC = 0b00000010;
-        __delay_us(20);
+        __delay_us(READ_WAIT);
         PORTC = 0b00000000;
-        __delay_us(20);
+        __delay_us(READ_WAIT);
             
         }
-        pc = pc << 1;
+        byt = byt << 1;
         //Don't bother dropping data line low if next bit is also a 1
-        if((pc & 0x80) == 0) {PORTC = 0b00000000;}
+        if((byt & 0x80) == 0) {PORTC = 0b00000000;}
         
     }
  //Check for ACK
@@ -116,7 +116,7 @@ void SendByte(char byt, char wt) {
     TRISC = 0b00110001;
     
     PORTC = 0b00000010;
-    __delay_us(20);
+    __delay_us(READ_WAIT);
    ack = PORTC & 1;
     PORTC = 0b00000000;
     
@@ -134,13 +134,9 @@ signed int DegreesC(int sensorval){
 }
 
 
-
-
 /**
  * DegreesAsc
  * Convert 16-bit int from sensor into degrees celsius in ASCII
- *
- * 
  */
 
 void DegreesAsc(int sensorval,char* degrees, char* frac,char volt) {
@@ -157,8 +153,6 @@ void DegreesAsc(int sensorval,char* degrees, char* frac,char volt) {
     itoa(frac,fraction,10);
     
 }
-
-
 
 /**
  * doCRC
@@ -186,8 +180,6 @@ void doCRC (unsigned char ch, unsigned char *crc)
     }
     return;
 }
-
-
 
 
 void UART_Write(char data)
@@ -238,17 +230,11 @@ void UART_Temp(int sensorval,char volt) {
 int CalcHumidity(int sensorval,int tempval){
     float rh; 
     char buf[10];
-    
     rh = -2.0468 + (0.0367 * sensorval) + ((RHc * sensorval)*(RHc * sensorval));
-    
     //Temperature compensate
     rh = ((tempval / 100) - 25) * (0.01 + (0.00008 * sensorval)) + rh;
-    
-    
     itoa(buf, (int) rh,10);
-    
     UART_String(buf);
-    
     return 0;
 }
 
@@ -268,16 +254,13 @@ void zero_b(char bt){
 void Set_Settings(char setts) {
     long wait_val = 0;
         SupSeq();
-        SendByte(0b00000110,20);
-         
+        SendByte(0b00000110);      
       __delay_us(1);
     //while((PORTC & 1) == 1) {
     //   wait_val++;
     //}
-        SendByte(setts,20);
-        
+        SendByte(setts);       
         TRISC = 0b00110000;
-
         __delay_ms(10);
 }
 
@@ -299,7 +282,7 @@ Sht_rtn Sensor_read(char val,char bytes){
     
     //Send command
     SupSeq(); //Start up sequence
-    SendByte(val,20);
+    SendByte(val);
    
    
     __delay_us(20);
@@ -316,12 +299,11 @@ Sht_rtn Sensor_read(char val,char bytes){
     tl=ReadByte(1);
    
     rval.crc_received=ReadByte(0);
-
-    
-    doCRC(tl,&rval.crc_generated);
-    
-    TRISC = 0b00110000;
+     TRISC = 0b00110000;
      
+  
+ //CRC Stuff    
+    doCRC(tl,&rval.crc_generated);
    for (ix = 0; ix < 8; ix++) {
       if ((0x80 >> ix) & rval.crc_received)
         revCRC |= (1 << ix);
