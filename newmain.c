@@ -50,8 +50,9 @@ void setser(void)
 {
     TXSTA = 0b00100000;
     RCSTA = 0b10010000;
-    SPBRG = 51; //1200 @ 4MHZ
-    BAUDCTLbits.BRG16 = 0;
+   // SPBRG = 51; //1200 @ 4MHZ
+    SPBRG = 25; //9600 @ 4
+    BAUDCTLbits.BRG16 = 1; // 0 FOR 1200
 }
 
 void main(void) {
@@ -60,6 +61,8 @@ void main(void) {
     Sht_rtn hum;
     int t;
     int h;
+    
+    int test = 0;
     
     TRISA = 0x00;
     ANSEL = 0x00;
@@ -76,9 +79,16 @@ void main(void) {
     T1CON = 0x35; //timer1 on
     CMCON0 = 0b00000111;
         
+    while(test < 1000)
+    {UART_Write(0x97); 
+    test++;
+    }
 
     while(1) {
         CLRWDT();
+        
+       
+        
         if (OUTPUT == 0){
             sh = Sensor_read(READ_TEMP,2);   
             //cnt = 0;
