@@ -2,6 +2,8 @@ import serial
 import struct
 import sqlite3
 import time
+import sys
+from math import log
 
 SQuery = {
     1: "CREATE TABLE IF NOT EXISTS TempSensor (Sensorid INTEGER, time INTEGER, temp INTEGER, hum INTEGER, setts INTEGER, crc INTEGER)",
@@ -9,9 +11,10 @@ SQuery = {
     }
 
 
-s = serial.Serial('/dev/ttyUSB0',9600,8,'N',1)
-
-lp = b''
+try: s = serial.Serial('/dev/ttyUSB0',9600,8,'N',1)
+except: 
+	sys.exit("Could not open serial port")
+	
 
 
 outfile = '/mnt/hdd/www/temp.txt'
@@ -23,6 +26,34 @@ dcurr = dbc.cursor()
 #Create tables
 dcurr.execute(SQuery[1])
 dbc.commit()
+
+#Wait for two 0xFF's to arrive on serial port
+def getstart():
+	res = 0
+	while(res != 65535):
+		time.sleep(0.5)
+		try:
+			res = res << 8
+			res = res + struct.unpack(">B",s.read(1))[0]
+			res = res & 65535
+		except:
+			print("Error receiving start sequence")
+			return False
+
+	return True
+
+#Get the 7 bytes following 0xFFFF
+def readsensor():
+	pck = b''
+	try:
+		pck = s.read(7)
+	except:
+		print("Serial error")
+		return False
+
+	return pck
+
+
 
 def savefile(temp,rh):
 	f = open(outfile,'w')
@@ -38,38 +69,27 @@ def savereading(sensor,temp,rh,setts,crc):
     dbc.commit()
     
 
+def dew(t,rh):
+		Dtn = dict(water=243.12, ice=272.62) # Table 9
+		Dm = dict(water=17.62, ice=22.46) # Table 9
+		'With t and rh provided, does not access the hardware.'
+		t_range = 'water' if t >= 0 else 'ice'
+		tn, m = Dtn[t_range], Dm[t_range]
+		return ( # ch 4.4
+			tn * (log(rh / 100.0) + (m * t) / (tn + t))
+			/ (m -log(rh / 100.0) - m * t / (tn + t)) )
+
 
 def process_package(pkg):
-    sc = struct.unpack(">HhhBBB",pkg)
-    if(sc[0] != 65535):
-        print("Error packet")
-        return 0
-    else:
-        print("Valid packet received")
-
-    print("Temperature: " + str(sc[1]/100) + "\n")
-    print("Humidity: " + str(sc[2]/100) + "\n")
-    savereading(1,sc[1]/100,sc[2]/100,0,0)
-    savefile(sc[1]/100,sc[2]/100)
-
-def init():
-    global lp
-    in1 = False
-    while(in1 == False):
-        b = s.read(1)
-        if(b == b'\xff'):
-            if(s.read(1) == b'\xff'):
-                in1 = True
-    lp = b'\xff\xff' 
-
-
-init()
-lp = lp + s.read(7)
-
-
+    sc = struct.unpack(">hhBBB",pkg)
+    print("Temperature: " + str(sc[0]/100))
+    print("Humidity: " + str(sc[1]/10) + "\n")
+    print("Dew: " + str(dew(sc[0]/100,sc[1]/10)) )
+    savereading(1,sc[0]/100,sc[1]/10,0,0)
+    savefile(sc[0]/100,sc[1]/100)
 
 
 while(1):
-    process_package(lp)
-    lp = s.read(9)
-    s.write(b'K')
+	if(getstart()):
+		res = readsensor()
+		process_package(res)

@@ -11,7 +11,16 @@
 #define SHT_TIMEOUT     800000 //Number of iterations to wait for SHT to return command
 #define READ_WAIT       20        //Number of uS between read states
 
+//#define T_OFFSET = -4010;
+#define T_OFFSET        -3970
+
 const float RHc = -1.5955E-6;
+const float RHc2 = 0.00008;
+const float RHc0 = -2.0468;
+const float RHc1 = 0.0367;
+
+
+
 
 
 char ReadByte(char getCRC){
@@ -128,8 +137,7 @@ void SendByte(char byt) {
 
 
 signed int DegreesC(int sensorval){
-    int offset = -4010; //For 5V
-    return offset + sensorval;
+    return (T_OFFSET + sensorval);
     
 }
 
@@ -188,6 +196,12 @@ void UART_Write(char data)
   TXREG = data;
 }
 
+//Needed for printf
+void putch(char data)
+{
+  while(!TRMT);
+  TXREG = data;
+}
 
 void UART_String(char* letters) {
     int i = 0;
@@ -213,11 +227,8 @@ void UART_Temp(int sensorval,char volt) {
     int deg;
     int fraction;
     
-    if(volt == 50) { offset = -4010;} //For 5V
-    else
-    { offset = -3970;} //For 3.3v
-    deg = (sensorval + offset) / 100;
-    fraction = abs((sensorval + offset) % 100);
+    deg = (sensorval + T_OFFSET) / 100;
+    fraction = abs((sensorval + T_OFFSET) % 100);
     
     itoa(buf,deg,10);
     UART_String(buf);
@@ -239,12 +250,13 @@ int CalcHumidity(int sensorval,int tempval){
 }
 
 int HumidityPercent(int sensorval,int tempval){
-    float rh; 
-    char buf[10];
-    rh = -2.0468 + (0.0367 * sensorval) + ((RHc * sensorval)*(RHc * sensorval));
-    //Temperature compensate
-    rh = ((tempval / 100) - 25) * (0.01 + (0.00008 * sensorval)) + rh;
-    return (int) rh*100;
+        float rh = RHc0 + (RHc1 * sensorval) + ((RHc * sensorval * sensorval));
+        float rht;
+        float truetemp = (T_OFFSET +  tempval) / 100;
+        //Temperature compensate        
+        rh = (truetemp - 25)*(0.01 + RHc2 * sensorval) + rh;
+        rh = rh*10;
+        return (int) rh;
 }
 
 
