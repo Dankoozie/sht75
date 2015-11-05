@@ -10,14 +10,13 @@
 #include <stdio.h>
 #include "sht7x.h"
 #include <pic16f688.h>
-int cnt = 0;
 
 #define OUTPUT 1 //0 = TEXT 1 = BIN
+#define SENSE_INTERVAL 2000 //Interval to wait between readings
 
-
-static const char *ctemp = "\n\rCurrent temperature: ";
-static const char *chum = "\n\rCurrent humidity (compensated): ";
-static const char *sht_status = "\n\rSHT7x sensor status: ";
+static const char *ctemp = "\n\rTemperature: ";
+static const char *chum = "\n\rRelative humidity: ";
+static const char *sht_status = "\n\rStatus byte: ";
 static const char *circ = " CRC OK";
 
 
@@ -31,20 +30,6 @@ static const char *circ = " CRC OK";
 #pragma config BOREN = ON       // Brown Out Detect (BOR enabled)
 #pragma config IESO = OFF       // Internal External Switchover bit (Internal External Switchover mode is disabled)
 #pragma config FCMEN = OFF      // Fail-Safe Clock Monitor Enabled bit (Fail-Safe Clock Monitor is disabled)
-
-void interrupt tc_int(void) {
-    
-    unsigned int i = 0;
-    if(PIR1bits.TMR1IF) 
-    {
-
-        PIR1bits.TMR1IF = 0;
-        cnt++;
-        
-    }
-          
-        
-        }
         
 void setser(void)
 {
@@ -80,18 +65,18 @@ void main(void) {
     CMCON0 = 0b00000111;
         
     while(test < 1000)
-    {UART_Write(0x97); 
+    {putch(0x97); 
     test++;
     }
 
     while(1) {
-        CLRWDT();
+      //  CLRWDT();
         
        
         
         if (OUTPUT == 0){
             sh = Sensor_read(READ_TEMP,2);   
-            //cnt = 0;
+
             UART_Const(ctemp);
             t = sh.sensor_val;
             UART_Temp(t,33);
@@ -99,7 +84,6 @@ void main(void) {
             if(sh.crc_ok){
             UART_Const(circ);
             }
-            
             
             UART_Const(chum);
             sh = Sensor_read(READ_HUMIDITY,2);
@@ -111,24 +95,24 @@ void main(void) {
         if(OUTPUT == 1)
         {
             sh = Sensor_read(READ_TEMP,2);
-            UART_Write(0xFF);
-            UART_Write(0xFF);
+            putch(0xFF);
+            putch(0xFF);
             t = DegreesC(sh.sensor_val);
-            UART_Write(t >> 8);
-            UART_Write(t & 255);
+            putch(t >> 8);
+            putch(t & 255);
             hum = Sensor_read(READ_HUMIDITY,2);
             h = HumidityPercent(hum.sensor_val,sh.sensor_val);
-            UART_Write(h >> 8);
-            UART_Write(h & 255);
-            UART_Write(Sensor_read(READ_STATUS,1).sensor_val & 255);
-            UART_Write(0x00); //For future outdoorsie temperature
-            UART_Write((sh.crc_ok << 1 ) + hum.crc_ok);
+            putch(h >> 8);
+            putch(h & 255);
+            putch(Sensor_read(READ_STATUS,1).sensor_val & 255);
+            putch(0x00); //For future outdoorsie temperature
+            putch((sh.crc_ok << 1 ) + hum.crc_ok);
             
             
          
         }
             
-          __delay_ms(2000);        
+          __delay_ms(SENSE_INTERVAL);        
     }
     
     return;

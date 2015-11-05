@@ -4,23 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sht7x.h"
-#define _XTAL_FREQ 8000000     
 
-#define CRC_POLY        0x31            /* CRC polynomial x**8 + x**5 + x**4 */
-#define SUP_WAIT        10      //Number of uS to wait between startup sequence steps
-#define SHT_TIMEOUT     800000 //Number of iterations to wait for SHT to return command
-#define READ_WAIT       20        //Number of uS between read states
-
-//#define T_OFFSET = -4010;
-#define T_OFFSET        -3970
-
+//Sht75 constants for relative humidity
 const float RHc = -1.5955E-6;
 const float RHc2 = 0.00008;
 const float RHc0 = -2.0468;
 const float RHc1 = 0.0367;
-
-
-
 
 
 char ReadByte(char getCRC){
@@ -143,26 +132,6 @@ signed int DegreesC(int sensorval){
 
 
 /**
- * DegreesAsc
- * Convert 16-bit int from sensor into degrees celsius in ASCII
- */
-
-void DegreesAsc(int sensorval,char* degrees, char* frac,char volt) {
-    int offset;
-    int deg;
-    int fraction;
-    if(volt == 50) { offset = -4010;} //For 5V
-    else
-    { offset = -3970;} //For 3.3v
-    deg = (sensorval + offset) / 100;
-    fraction = (sensorval + offset) % 100;
-    
-    itoa(degrees,deg,10);
-    itoa(frac,fraction,10);
-    
-}
-
-/**
  * doCRC
  * <<<This function is shamelessly copied from elsewhere>>>
  *      Routine to calculate the CRC while message is sent / received
@@ -190,11 +159,6 @@ void doCRC (unsigned char ch, unsigned char *crc)
 }
 
 
-void UART_Write(char data)
-{
-  while(!TRMT);
-  TXREG = data;
-}
 
 //Needed for printf
 void putch(char data)
@@ -206,7 +170,7 @@ void putch(char data)
 void UART_String(char* letters) {
     int i = 0;
     while(letters[i] != 0) {
-        UART_Write(letters[i++]);
+        putch(letters[i++]);
     }
 }
 
@@ -214,7 +178,7 @@ void UART_String(char* letters) {
 void UART_Const(const char* letters) {
     int i = 0;
     while(letters[i] != 0) {
-        UART_Write(letters[i++]);
+        putch(letters[i++]);
     }
 }
 
@@ -232,21 +196,17 @@ void UART_Temp(int sensorval,char volt) {
     
     itoa(buf,deg,10);
     UART_String(buf);
-    UART_Write(46); //Decimal point
+    putch(46); //Decimal point
     itoa(buf,fraction,10);
     UART_String(buf);
-    UART_Write(248);
+    putch(248);
 }
 
-int CalcHumidity(int sensorval,int tempval){
-    float rh; 
-    char buf[10];
-    rh = -2.0468 + (0.0367 * sensorval) + ((RHc * sensorval)*(RHc * sensorval));
-    //Temperature compensate
-    rh = ((tempval / 100) - 25) * (0.01 + (0.00008 * sensorval)) + rh;
-    itoa(buf, (int) rh,10);
+void CalcHumidity(int sensorval,int tempval){
+    char buf[5];
+    int rh = HumidityPercent(sensorval,tempval);
+    itoa(buf, (int) rh/10,10);
     UART_String(buf);
-    return 0;
 }
 
 int HumidityPercent(int sensorval,int tempval){
@@ -262,18 +222,19 @@ int HumidityPercent(int sensorval,int tempval){
 
 void zero_b(char bt){
     char lp;
-    UART_Write(48);
-    UART_Write(98);
+    putch(48);
+    putch(98);
     for(lp=8;lp>0;lp--){
         if((bt & (1<<lp-1)) != 0){
-            UART_Write(49);
+            putch(49);
         }
-        else{UART_Write(48);}
+        else{putch(48);}
     }
 }
 
 
 void Set_Settings(char setts) {
+    //Be careful, may not work and may put sensor into 8/10bit mode
     long wait_val = 0;
         SupSeq();
         SendByte(0b00000110);      
@@ -287,8 +248,8 @@ void Set_Settings(char setts) {
 }
 
 
-
 Sht_rtn Sensor_read(char val,char bytes){
+    //Val = command to send, bytes = number of bytes to read (can only be 1 or 2)
     Sht_rtn rval;
     rval.wait_val = 0;
     
@@ -307,7 +268,7 @@ Sht_rtn Sensor_read(char val,char bytes){
     SendByte(val);
    
    
-    __delay_us(20);
+    __delay_us(READ_WAIT);
     //Wait for line to be pulled low
     while(((PORTC & 1) == 1) && rval.wait_val < SHT_TIMEOUT) {
        rval.wait_val++;
@@ -325,7 +286,7 @@ Sht_rtn Sensor_read(char val,char bytes){
      
   
  //CRC Stuff    
-    doCRC(tl,&rval.crc_generated);
+   doCRC(tl,&rval.crc_generated);
    for (ix = 0; ix < 8; ix++) {
       if ((0x80 >> ix) & rval.crc_received)
         revCRC |= (1 << ix);
@@ -333,9 +294,6 @@ Sht_rtn Sensor_read(char val,char bytes){
   rval.crc_received = revCRC;
   if (rval.crc_generated == rval.crc_received) { rval.crc_ok = 1;}
   
-   
-   rval.sensor_val = (th<<8) + tl;
-   
-   return rval;
-
+  rval.sensor_val = (th<<8) + tl; 
+  return rval;
 }
